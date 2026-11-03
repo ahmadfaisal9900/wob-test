@@ -1,0 +1,9 @@
+__pycache__/
+.DS_Store
+Thumbs.db
+.venv/
+node_modules/
+*.log
+browser-check-result.html
+workplace-wellbeing.zip
+functionality.md

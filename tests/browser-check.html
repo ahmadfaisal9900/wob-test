@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Browser interaction checks</title></head><body>
+<h1>Browser interaction checks</h1><pre id="results">Running…</pre><iframe id="site" src="../index.html#assessments" style="width:1280px;height:900px;border:0" title="Site under test"></iframe>
+<script>
+const frame = document.querySelector('#site');
+frame.addEventListener('load', async () => {
+  const results = [];
+  const check = (condition, message) => { results.push(`${condition ? 'PASS' : 'FAIL'}: ${message}`); if (!condition) throw new Error(message); };
+  const pause = () => new Promise(resolve => setTimeout(resolve, 250));
+  try {
+    const doc = frame.contentDocument;
+    const win = frame.contentWindow;
+    check(doc.title.includes('Workplace Wellbeing'), 'Correct site loaded');
+    const tabs = [...doc.querySelectorAll('[role="tab"]')];
+    let instruments = 0;
+    for (const tab of tabs) {
+      tab.click();
+      check(tab.getAttribute('aria-selected') === 'true', `Select ${tab.dataset.area}`);
+      check(doc.querySelectorAll('[role="tab"][aria-selected="true"]').length === 1, 'One selected tab');
+      check(doc.querySelector('#assessment-panel').getAttribute('aria-labelledby') === tab.id, 'Panel accessible name follows selection');
+      instruments += doc.querySelectorAll('#instrument-list > div').length;
+    }
+    check(instruments === 10, 'All ten assessment modules are represented');
+    tabs[0].focus();
+    tabs[0].dispatchEvent(new win.KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    check(doc.activeElement === tabs[4], 'End key focuses the last assessment tab');
+    check(tabs[4].getAttribute('aria-selected') === 'true', 'Keyboard navigation selects tab');
+    const disclosure = doc.querySelector('details');
+    disclosure.querySelector('summary').click();
+    check(disclosure.open, 'FAQ expands');
+    const form = doc.querySelector('#enquiry-form');
+    const fill = (name, value) => { form.elements.namedItem(name).value = value; };
+    fill('name', 'Test Visitor'); fill('email', 'visitor@example.org'); fill('organization', '<script>test<' + '/script>');
+    fill('size', '51–200 people'); fill('interest', 'Workplace wellbeing assessment'); fill('message', 'Support for our team.');
+    form.requestSubmit();
+    check(doc.querySelector('#enquiry-dialog').open, 'Valid enquiry opens preview');
+    check(doc.querySelector('#enquiry-preview').textContent.includes('visitor@example.org'), 'Enquiry contains entered details');
+    check(!doc.querySelector('#enquiry-preview script'), 'Entered text renders without HTML execution');
+    check(doc.querySelector('#email-enquiry').hidden, 'Email action remains hidden without configured address');
+    doc.querySelector('.dialog-close').click();
+    check(!doc.querySelector('#enquiry-dialog').open, 'Enquiry preview closes');
+    for (const width of [1280, 768, 390, 320]) {
+      frame.style.width = width + 'px';
+      await pause();
+      check(doc.documentElement.scrollWidth <= width + 1, `No horizontal overflow at ${width}px`);
+    }
+    doc.querySelector('.menu-toggle').click();
+    check(doc.querySelector('#mobile-menu').open, 'Mobile menu opens');
+    check(doc.querySelector('.menu-toggle').getAttribute('aria-expanded') === 'true', 'Menu expanded state updates');
+    doc.querySelector('#mobile-menu a').click();
+    await pause();
+    check(!doc.querySelector('#mobile-menu').open, 'Menu navigation closes dialog');
+    check(!doc.body.classList.contains('menu-open'), 'Body scroll is restored');
+    results.push('ALL CHECKS PASSED');
+  } catch (error) { results.push('ERROR: ' + error.message); }
+  document.querySelector('#results').textContent = results.join('\n');
+  document.title = results.includes('ALL CHECKS PASSED') ? 'PASS — Browser checks' : 'FAIL — Browser checks';
+});
+</script></body></html>
